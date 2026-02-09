@@ -17,7 +17,7 @@ export function generateDiscordOauthUrl(host: string) {
     params.append("client_id", env.DISCORD_CLIENT_ID);
     params.append("redirect_uri", getRedirectUri(host, "discord"));
     params.append("response_type", "code");
-    params.append("scope", [OAuth2Scopes.Identify, OAuth2Scopes.GuildsMembersRead].join(" "));
+    params.append("scope", [OAuth2Scopes.Identify, OAuth2Scopes.GuildsMembersRead, OAuth2Scopes.GuildsJoin].join(" "));
 
     return "https://discord.com/oauth2/authorize?" + params.toString();
 }

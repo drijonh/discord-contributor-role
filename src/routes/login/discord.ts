@@ -1,4 +1,4 @@
-import type { RESTError, RESTGetAPIGuildMemberResult, RESTGetAPIUserResult, RESTPostOAuth2AccessTokenResult } from "discord-api-types/v10";
+import type { RESTError, RESTGetAPIGuildMemberResult, RESTGetAPIUserResult, RESTPostOAuth2AccessTokenResult, RESTPutAPIGuildMemberJSONBody, RESTPutAPIGuildMemberResult } from "discord-api-types/v10";
 import { Routes } from "discord-api-types/v10";
 
 import { REST } from "../../discord/rest";
@@ -14,12 +14,21 @@ export async function loginDiscord(request: Request, env: Env) {
     const access = await exchangeToken(env, host, code);
     if ("error_description" in access) return err(request, access.error_description);
 
-    const { user, member } = await getUserAndMember(new REST({ version: "10", authPrefix: "Bearer" }).setToken(access.access_token), env);
+    const rest = new REST({ version: "10", authPrefix: "Bearer" }).setToken(access.access_token);
+
+    const { user, member } = await getUserAndMember(rest, env);
     if (!user || "message" in user) return err(request, "Invalid user");
-    if (!member || "message" in member) return err(request, `You must be a member of the ${env.GITHUB_OWNER}/${env.GITHUB_REPO} discord server`);
+
+    if (!member || "message" in member) {
+        try {
+            const added = await addMemberToServer(user.id, access.access_token, env);
+            if (added && "message" in added) throw new Error(added.message);
+        } catch {
+            return err(request, `You must be a member of the ${env.GITHUB_OWNER}/${env.GITHUB_REPO} discord server`);
+        }
+    }
 
     const url = generateGithubOauthUrl(host);
-
     const token = await discordCookie.set(user.id, user.username, user.avatar);
 
     return new Response(null, {
@@ -68,4 +77,14 @@ async function getUserAndMember(rest: REST, env: Env) {
         : undefined;
 
     return { user, member };
+}
+
+// The Authorization header must be a Bot token (belonging to the same application used for authorization)
+// https://discord.com/developers/docs/resources/guild#add-guild-member
+async function addMemberToServer(userId: string, token: string, env: Env) {
+    return discord.put(Routes.guildMember(env.DISCORD_SERVER_ID, userId), {
+        body: {
+            access_token: token
+        } satisfies RESTPutAPIGuildMemberJSONBody
+    }) as Promise<RESTPutAPIGuildMemberResult | null | RESTError>;
 }
