@@ -31,12 +31,14 @@ export async function loginDiscord(request: Request, env: Env) {
     const url = generateGithubOauthUrl(host);
     const token = await discordCookie.set(user.id, user.username, user.avatar);
 
+    const headers = new Headers();
+    headers.set("Location", url);
+    headers.append("Set-Cookie", `discord=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`);
+    headers.append("Set-Cookie", "github=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
+
     return new Response(null, {
         status: 302,
-        headers: {
-            Location: url,
-            "Set-Cookie": `discord=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`
-        }
+        headers
     });
 }
 
